@@ -1,1 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>АИС Burger King | Система Управления Заказами</title>
+    <style>
+        :root { --red: #e21212; --brown: #502314; --orange: #f5ebdc; --white: #ffffff; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--orange); color: var(--brown); margin: 0; }
+        
+        /* Авторизация */
+        #auth-screen { display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--brown); }
+        .login-box { background: white; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        
+        /* Основной интерфейс */
+        #main-app { display: none; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; background: var(--white); padding: 10px 40px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        
+        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; margin-top: 30px; max-width: 1200px; margin-left: auto; margin-right: auto; }
+        
+        /* Меню */
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .burger-card { background: white; padding: 20px; border-radius: 15px; text-align: center; transition: 0.3s; border: 2px solid transparent; }
+        .burger-card:hover { border-color: var(--red); transform: translateY(-5px); }
+        .burger-card img { width: 100%; border-radius: 10px; }
+        
+        /* Корзина и БД */
+        .sidebar { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); height: fit-content; }
+        .order-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        
+        .btn { background: var(--red); color: white; border: none; padding: 12px 25px; border-radius: 30px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 15px; }
+        .btn:hover { background: var(--brown); }
+        .btn-outline { background: none; border: 2px solid var(--red); color: var(--red); }
 
+        .db-status { font-size: 12px; color: green; margin-top: 10px; display: block; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="auth-screen">
+    <div class="login-box">
+        <h2 style="color: var(--red)">Вход в АИС Burger King</h2>
+        <input type="text" id="username" placeholder="Логин" style="padding: 10px; margin: 10px; width: 80%"><br>
+        <input type="password" placeholder="Пароль" style="padding: 10px; margin: 10px; width: 80%"><br>
+        <button class="btn" onclick="login()">Войти в систему</button>
+    </div>
+</div>
+
+<div id="main-app">
+    <header>
+        <h1 style="color: var(--red); margin: 0;">BURGER KING <span style="font-size: 14px; color: var(--brown)">Digital Systems</span></h1>
+        <div>Пользователь: <strong id="user-display"></strong> | <a href="#" onclick="location.reload()">Выход</a></div>
+    </header>
+
+    <div class="grid">
+        <div class="menu-section">
+            <h2>Меню АИС (Таблица Products)</h2>
+            <div class="menu-grid" id="menu-container">
+                </div>
+        </div>
+
+        <div class="sidebar">
+            <h3>Текущий заказ</h3>
+            <div id="cart-content">
+                <p style="color: #999">Корзина пуста. Ожидание ввода данных...</p>
+            </div>
+            <div id="total-section" style="display:none">
+                <hr>
+                <div style="display:flex; justify-content:space-between; font-weight:bold; font-size: 1.2em">
+                    <span>Итого:</span>
+                    <span id="total-amount">0</span><span> ₽</span>
+                </div>
+                <button class="btn" onclick="processOrder()">Оформить (Запись в БД)</button>
+                <span class="db-status">● Соединение с СУБД: Активно (SQL)</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Имитация базы данных товаров
+    const products = [
+        { id: 1, name: 'Воппер', price: 250 },
+        { id: 2, name: 'Стейкхаус', price: 380 },
+        { id: 3, name: 'Кинг Фри', price: 110 },
+        { id: 4, name: 'Луковые кольца', price: 140 },
+        { id: 5, name: 'Кола Зеро', price: 120 },
+        { id: 6, name: 'Цезарь Ролл', price: 210 }
+    ];
+
+    let cart = [];
+
+    // Логика входа
+    function login() {
+        const user = document.getElementById('username').value;
+        if (user.length < 2) return alert("Введите логин");
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'block';
+        document.getElementById('user-display').innerText = user;
+        renderMenu();
+    }
+
+    // Отрисовка меню из "БД"
+    function renderMenu() {
+        const container = document.getElementById('menu-container');
+        container.innerHTML = products.map(p => `
+            <div class="burger-card">
+                <h3>${p.name}</h3>
+                <p class="price">${p.price} ₽</p>
+                <button class="btn btn-outline" onclick="addToCart(${p.id})">Выбрать</button>
+            </div>
+        `).join('');
+    }
+
+    function addToCart(id) {
+        const product = products.find(p => p.id === id);
+        cart.push(product);
+        renderCart();
+    }
+
+    function renderCart() {
+        const cartDiv = document.getElementById('cart-content');
+        const totalSection = document.getElementById('total-section');
+        
+        if (cart.length === 0) {
+            cartDiv.innerHTML = '<p style="color: #999">Корзина пуста</p>';
+            totalSection.style.display = 'none';
+            return;
+        }
+
+        totalSection.style.display = 'block';
+        cartDiv.innerHTML = cart.map(item => `
+            <div class="order-item">
+                <span>${item.name}</span>
+                <b>${item.price} ₽</b>
+            </div>
+        `).join('');
+
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        document.getElementById('total-amount').innerText = total;
+    }
+
+    // Имитация работы SQL транзакции
+    function processOrder() {
+        const total = document.getElementById('total-amount').innerText;
+        alert(`ТРАНЗАКЦИЯ УСПЕШНА!\n\n1. Создана запись в таблице Orders.\n2. Сгенерирован чек на сумму ${total} ₽.\n3. Статус оплаты: ПРОВЕДЕНО через API банка.`);
+        cart = [];
+        renderCart();
+    }
+</script>
+
+</body>
+</html>
